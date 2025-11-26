@@ -94,7 +94,7 @@
         /* For modal */
         .modal-backdrop {
             background-color: rgba(0, 0, 0, 0.5);
-            display: flex;
+            /* display: flex; REMOVED to avoid conflict with hidden class */
             transition: opacity 0.3s ease;
         }
        .skip-link {
@@ -275,22 +275,25 @@
         <div id="app-view" class="hidden">
             <div class="flex h-screen">
                 <!-- Sidebar -->
-                <aside id="sidebar" class="w-64 flex flex-col">
+                <aside id="sidebar" class="w-64 flex flex-col hidden md:flex">
                     <div class="p-4 flex items-center justify-center gap-3 border-b border-gray-700">
                        <i class="fas fa-calendar-alt text-2xl text-blue-500"></i>
                        <h1 class="text-2xl font-bold">Schedulia</h1>
                     </div>
-                    <nav id="sidebar-nav" class="flex-1 p-4 space-y-2">
+                    <nav id="sidebar-nav" class="flex-1 p-4 space-y-2 overflow-y-auto">
                         <!-- Navigation links will be inserted here by JavaScript -->
                     </nav>
                 </aside>
 
                 <!-- Main Content -->
-                <div class="flex-1 flex flex-col">
+                <div class="flex-1 flex flex-col h-screen overflow-hidden">
                     <!-- Header -->
-                    <header class="flex items-center justify-between p-4 shadow-md z-10">
-                        <div>
-                           <h2 class="text-xl font-semibold">Selamat Datang, <span id="user-name"></span>!</h2>
+                    <header class="flex items-center justify-between p-4 shadow-md z-10 shrink-0">
+                        <div class="flex items-center gap-3">
+                            <button id="mobile-menu-btn" class="md:hidden p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700">
+                                <i class="fas fa-bars text-xl"></i>
+                            </button>
+                           <h2 class="text-xl font-semibold">Hai, <span id="user-name"></span>!</h2>
                         </div>
                         <div class="flex items-center space-x-4">
                             <button id="theme-toggle" class="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700">
@@ -301,7 +304,7 @@
                                 <span id="notification-dot" class="absolute top-1 right-1 h-2 w-2 bg-red-500 rounded-full hidden"></span>
                             </button>
                             <button id="logout-btn" class="flex items-center px-4 py-2 text-sm font-medium text-white bg-red-500 rounded-lg hover:bg-red-600">
-                                <i class="fas fa-sign-out-alt mr-2"></i>Logout
+                                <i class="fas fa-sign-out-alt mr-2 md:inline"></i><span class="hidden md:inline">Logout</span>
                             </button>
                         </div>
                     </header>
@@ -314,6 +317,21 @@
             </div>
         </div>
         
+        <!-- Mobile Sidebar Overlay -->
+        <div id="mobile-sidebar-overlay" class="fixed inset-0 bg-black/50 z-40 hidden md:hidden"></div>
+        <div id="mobile-sidebar" class="fixed inset-y-0 left-0 w-64 bg-gray-800 text-white z-50 transform -translate-x-full transition-transform duration-300 md:hidden">
+             <div class="p-4 flex items-center justify-between border-b border-gray-700">
+                <div class="flex items-center gap-2">
+                    <i class="fas fa-calendar-alt text-xl text-blue-500"></i>
+                    <h1 class="text-xl font-bold">Schedulia</h1>
+                </div>
+                <button id="close-mobile-sidebar" class="p-2 text-gray-400 hover:text-white"><i class="fas fa-times"></i></button>
+             </div>
+             <nav id="mobile-sidebar-nav" class="p-4 space-y-2 overflow-y-auto h-full">
+                <!-- Mobile nav links -->
+             </nav>
+        </div>
+
         <!-- Modal for Admin Forms and Notifications -->
         <div id="admin-modal" class="fixed inset-0 z-50 items-center justify-center hidden modal-backdrop">
             <div id="modal-content" class="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-lg p-6 m-4 max-h-[90vh] overflow-y-auto">
@@ -338,16 +356,6 @@
         const SUPABASE_URL = 'https://wyrhnjeoitiesitbpkvw.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind5cmhuamVvaXRpZXNpdGJwa3Z3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAzODI0NjQsImV4cCI6MjA3NTk1ODQ2NH0.lpsW-Njs2ebnVKBN8sSL5Bu5p1XjSQ6AhHhi8w-m-sE';
 
-        if (SUPABASE_URL === 'URL_PROYEK_SUPABASE_ANDA' || SUPABASE_ANON_KEY === 'KUNCI_ANON_SUPABASE_ANDA') {
-            document.body.innerHTML = `<div class="flex items-center justify-center h-screen bg-red-100 text-red-800 p-8 text-center">
-                <div class="max-w-md">
-                    <h1 class="text-2xl font-bold mb-4">Kesalahan Konfigurasi</h1>
-                    <p>Harap buka file <strong>kalkulator.html</strong> dan ganti <code>SUPABASE_URL</code> dan <code>SUPABASE_ANON_KEY</code> dengan kredensial dari proyek Supabase Anda. Ikuti petunjuk di file <strong>panduan_supabase.md</strong>.</p>
-                </div>
-            </div>`;
-            return;
-        }
-
         const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
         
         // --- APPLICATION STATE ---
@@ -363,6 +371,7 @@
                 ruangans: [],
                 siswas: [],
                 acaraSekolah: [],
+                materis: [], // Cache untuk materi
             }
         };
 
@@ -374,6 +383,7 @@
         const userNameEl = document.getElementById('user-name');
         const mainContent = document.getElementById('main-content');
         const sidebarNav = document.getElementById('sidebar-nav');
+        const mobileSidebarNav = document.getElementById('mobile-sidebar-nav');
         const modal = document.getElementById('admin-modal');
         const modalTitle = document.getElementById('modal-title');
         const modalBody = document.getElementById('modal-body');
@@ -381,10 +391,26 @@
         const notificationBtn = document.getElementById('notification-btn');
         const notificationDot = document.getElementById('notification-dot');
         const themeToggle = document.getElementById('theme-toggle');
+        const mobileMenuBtn = document.getElementById('mobile-menu-btn');
+        const mobileSidebar = document.getElementById('mobile-sidebar');
+        const mobileSidebarOverlay = document.getElementById('mobile-sidebar-overlay');
+        const closeMobileSidebarBtn = document.getElementById('close-mobile-sidebar');
 
         const showLoader = () => {
             mainContent.innerHTML = `<div class="flex justify-center items-center h-full"><span class="loader"></span></div>`;
         };
+
+        // --- MOBILE SIDEBAR ---
+        mobileMenuBtn.addEventListener('click', () => {
+            mobileSidebar.classList.remove('-translate-x-full');
+            mobileSidebarOverlay.classList.remove('hidden');
+        });
+        const hideMobileSidebar = () => {
+             mobileSidebar.classList.add('-translate-x-full');
+             mobileSidebarOverlay.classList.add('hidden');
+        };
+        closeMobileSidebarBtn.addEventListener('click', hideMobileSidebar);
+        mobileSidebarOverlay.addEventListener('click', hideMobileSidebar);
 
         // --- THEME LOGIC ---
         themeToggle.addEventListener('click', () => {
@@ -419,7 +445,7 @@
                 .from('users')
                 .select('*')
                 .eq('username', username)
-                .eq('password', password) // WARNING: Unsafe for production
+                .eq('password', password)
                 .single();
 
             if (user && !error) {
@@ -456,15 +482,10 @@
             loginView.classList.remove('hidden');
             loginView.classList.add('flex');
         });
-        
-        // --- PRAYER TIME ---
-        async function fetchAndUpdatePrayerTime() {
-            // This function remains the same as it fetches from an external API
-        }
 
         // --- DATA CACHING & FETCHING ---
         async function cacheInitialData() {
-            const tablesToCache = ['kelas', 'gurus', 'mapels', 'ruangans', 'siswas', 'acara_sekolah', 'users']; // Tambahkan 'users'
+            const tablesToCache = ['kelas', 'gurus', 'mapels', 'ruangans', 'siswas', 'acara_sekolah', 'users', 'materis'];
             for (const table of tablesToCache) {
                 const { data, error } = await supabase.from(table).select('*');
                 if (data) {
@@ -497,7 +518,7 @@
             renderView(initialView);
         }
         
-        // --- SIDEBAR AND NAVIGATION (No changes needed) ---
+        // --- SIDEBAR AND NAVIGATION ---
         function setupSidebar() {
             const role = state.currentUser.role;
             let navLinks = '';
@@ -526,19 +547,29 @@
                     <a href="#" class="sidebar-link block p-3 rounded-lg" data-view="siswa-materi"><i class="fas fa-book w-6"></i> Materi Pelajaran</a>
                 `;
             }
+            
+            // Render to both sidebars
             sidebarNav.innerHTML = navLinks;
-            sidebarNav.querySelectorAll('.sidebar-link').forEach(link => {
-                link.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    renderView(e.currentTarget.dataset.view);
+            mobileSidebarNav.innerHTML = navLinks;
+
+            // Attach listeners to both
+            [sidebarNav, mobileSidebarNav].forEach(nav => {
+                nav.querySelectorAll('.sidebar-link').forEach(link => {
+                    link.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        renderView(e.currentTarget.dataset.view);
+                        hideMobileSidebar();
+                    });
                 });
             });
         }
         
         function updateActiveSidebar(view) {
-             sidebarNav.querySelectorAll('.sidebar-link').forEach(link => {
-                link.classList.toggle('active', link.dataset.view === view);
-            });
+             [sidebarNav, mobileSidebarNav].forEach(nav => {
+                nav.querySelectorAll('.sidebar-link').forEach(link => {
+                    link.classList.toggle('active', link.dataset.view === view);
+                });
+             });
         }
 
         // --- MAIN RENDER FUNCTION ---
@@ -550,17 +581,16 @@
             const views = {
                 'siswa-dashboard': renderSiswaDashboard,
                 'siswa-jadwal': () => renderJadwalLengkap({ role: 'siswa' }),
+                'siswa-materi': renderSiswaMateri, // Baru
                 'guru-dashboard': renderGuruDashboard,
                 'guru-jadwal': () => renderJadwalLengkap({ role: 'guru' }),
                 'admin-dashboard': renderAdminDashboard,
                 'admin-jadwal': renderAdminJadwal,
                 'admin-kalender': renderKalender,
                 'admin-logs': renderAdminLogs,
-                'admin-pengguna': renderAdminPengguna, // Panggil fungsi baru
-                // Placeholder for unimplemented features
-                'siswa-materi': () => mainContent.innerHTML = '<h2>Materi Pelajaran (Soon)</h2>',
+                'admin-pengguna': renderAdminPengguna,
+                'admin-materi': renderAdminMateri, // Baru
                 'guru-kehadiran': () => mainContent.innerHTML = '<h2>Pencatatan Kehadiran (Soon)</h2>',
-                'admin-materi': () => mainContent.innerHTML = '<h2>Kelola Materi (Soon)</h2>',
                 'admin-pengumuman': () => mainContent.innerHTML = '<h2>Kirim Pengumuman (Soon)</h2>',
             };
 
@@ -653,7 +683,7 @@
             const { count: siswaCount } = await supabase.from('siswas').select('*', { count: 'exact', head: true });
             const { count: guruCount } = await supabase.from('gurus').select('*', { count: 'exact', head: true });
             const { count: kelasCount } = await supabase.from('kelas').select('*', { count: 'exact', head: true });
-            const { count: jadwalCount } = await supabase.from('jadwals').select('*', { count: 'exact', head: true });
+            const { count: materiCount } = await supabase.from('materis').select('*', { count: 'exact', head: true });
             
             mainContent.innerHTML = `
                 <h2 class="text-3xl font-bold mb-6">Dashboard Admin</h2>
@@ -680,17 +710,17 @@
                         </div>
                     </div>
                      <div class="stat-card p-6 rounded-lg shadow-lg flex items-center space-x-4">
-                        <i class="fas fa-calendar-alt text-3xl text-red-500"></i>
+                        <i class="fas fa-book text-3xl text-red-500"></i>
                         <div>
-                            <p class="text-gray-500 dark:text-gray-400">Total Jadwal</p>
-                            <p class="text-2xl font-bold">${jadwalCount}</p>
+                            <p class="text-gray-500 dark:text-gray-400">Total Materi</p>
+                            <p class="text-2xl font-bold">${materiCount || 0}</p>
                         </div>
                     </div>
                 </div>
             `;
         }
         
-        // --- JADWAL LENGKAP VIEW ---
+        // --- JADWAL LENGKAP VIEW (No changes) ---
         async function renderJadwalLengkap({ role }) {
              let jadwalData, title;
 
@@ -707,11 +737,11 @@
             }
 
             const dayOrder = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat"];
-            let tableHTML = `<div class="flex justify-between items-center mb-6">
+            let tableHTML = `<div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                                 <h2 class="text-3xl font-bold">${title}</h2>
-                                <div>
-                                    <button id="export-pdf" class="bg-red-500 text-white px-4 py-2 rounded-lg mr-2 hover:bg-red-600 transition-colors"><i class="fas fa-file-pdf mr-2"></i>Export PDF</button>
-                                    <button id="export-excel" class="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition-colors"><i class="fas fa-file-excel mr-2"></i>Export Excel</button>
+                                <div class="flex gap-2">
+                                    <button id="export-pdf" class="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition-colors text-sm"><i class="fas fa-file-pdf mr-2"></i>PDF</button>
+                                    <button id="export-excel" class="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition-colors text-sm"><i class="fas fa-file-excel mr-2"></i>Excel</button>
                                 </div>
                              </div>
                              <div class="space-y-8">`;
@@ -768,7 +798,216 @@
             document.getElementById('export-pdf').addEventListener('click', () => exportJadwal('pdf', title, jadwalData, role));
             document.getElementById('export-excel').addEventListener('click', () => exportJadwal('excel', title, jadwalData, role));
         }
-        
+
+        // --- MATERI MANAGEMENT (ADMIN) ---
+        async function renderAdminMateri() {
+             mainContent.innerHTML = `
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-3xl font-bold">Kelola Materi Pelajaran</h2>
+                    <button id="add-materi-btn" class="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors">
+                        <i class="fas fa-plus mr-2"></i>Tambah Materi
+                    </button>
+                </div>
+                <div class="overflow-x-auto bg-white dark:bg-gray-800 rounded-lg shadow-lg">
+                     <table class="min-w-full text-left">
+                        <thead class="bg-gray-100 dark:bg-gray-700">
+                            <tr>
+                                <th class="p-4">Judul</th>
+                                <th class="p-4">Mata Pelajaran</th>
+                                <th class="p-4">Kelas</th>
+                                <th class="p-4">Guru</th>
+                                <th class="p-4">Link</th>
+                                <th class="p-4">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody id="materi-table-body"></tbody>
+                    </table>
+                </div>`;
+             
+             displayMateriTable();
+             document.getElementById('add-materi-btn').addEventListener('click', () => openMateriForm());
+        }
+
+        async function displayMateriTable() {
+            const tableBody = document.getElementById('materi-table-body');
+            tableBody.innerHTML = `<tr><td colspan="6" class="p-4 text-center">Memuat materi...</td></tr>`;
+            
+            await cacheInitialData(); // Refresh data
+            const materis = state.dbCache.materis;
+
+            if (!materis || materis.length === 0) {
+                tableBody.innerHTML = `<tr><td colspan="6" class="p-4 text-center">Belum ada materi.</td></tr>`;
+                return;
+            }
+
+            tableBody.innerHTML = materis.map(m => `
+                <tr class="border-t dark:border-gray-600">
+                    <td class="p-4">
+                        <div class="font-semibold">${m.judul}</div>
+                        <div class="text-xs text-gray-500">${m.deskripsi || '-'}</div>
+                    </td>
+                    <td class="p-4">${getMapelName(m.mapel_id)}</td>
+                    <td class="p-4">${getKelasName(m.kelas_id)}</td>
+                    <td class="p-4">${getGuruName(m.guru_id)}</td>
+                    <td class="p-4"><a href="${m.link}" target="_blank" class="text-blue-500 hover:underline"><i class="fas fa-external-link-alt mr-1"></i>Buka</a></td>
+                    <td class="p-4">
+                        <button class="edit-materi-btn text-blue-500 hover:text-blue-700 mr-2" data-id="${m.id}"><i class="fas fa-edit"></i></button>
+                        <button class="delete-materi-btn text-red-500 hover:text-red-700" data-id="${m.id}"><i class="fas fa-trash"></i></button>
+                    </td>
+                </tr>`).join('');
+
+            document.querySelectorAll('.edit-materi-btn').forEach(btn => btn.addEventListener('click', (e) => openMateriForm(e.currentTarget.dataset.id)));
+            document.querySelectorAll('.delete-materi-btn').forEach(btn => btn.addEventListener('click', (e) => deleteMateri(e.currentTarget.dataset.id)));
+        }
+
+        async function openMateriForm(materiId = null) {
+            const { data: materi } = materiId ? await supabase.from('materis').select('*').eq('id', materiId).single() : { data: {} };
+            const title = materiId ? 'Edit Materi' : 'Tambah Materi Baru';
+            
+            const formHTML = `
+                <form id="materi-form" class="space-y-4">
+                    <input type="hidden" name="id" value="${materi.id || ''}">
+                    <div>
+                        <label class="block text-sm font-medium">Judul Materi</label>
+                        <input type="text" name="judul" value="${materi.judul || ''}" required class="mt-1 block w-full p-2 border rounded-md dark:bg-gray-700">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium">Link Materi (Google Drive, YouTube, dll)</label>
+                        <input type="url" name="link" value="${materi.link || ''}" required placeholder="https://..." class="mt-1 block w-full p-2 border rounded-md dark:bg-gray-700">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium">Deskripsi (Opsional)</label>
+                        <textarea name="deskripsi" class="mt-1 block w-full p-2 border rounded-md dark:bg-gray-700">${materi.deskripsi || ''}</textarea>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium">Mata Pelajaran</label>
+                        <select name="mapel_id" required class="mt-1 block w-full p-2 border rounded-md dark:bg-gray-700">${state.dbCache.mapels.map(m => `<option value="${m.id}" ${materi.mapel_id == m.id ? 'selected' : ''}>${m.nama}</option>`).join('')}</select>
+                    </div>
+                     <div>
+                        <label class="block text-sm font-medium">Kelas</label>
+                        <select name="kelas_id" required class="mt-1 block w-full p-2 border rounded-md dark:bg-gray-700">${state.dbCache.kelas.map(k => `<option value="${k.id}" ${materi.kelas_id == k.id ? 'selected' : ''}>${k.nama}</option>`).join('')}</select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium">Guru Pengampu</label>
+                        <select name="guru_id" required class="mt-1 block w-full p-2 border rounded-md dark:bg-gray-700">${state.dbCache.gurus.map(g => `<option value="${g.id}" ${materi.guru_id == g.id ? 'selected' : ''}>${g.nama}</option>`).join('')}</select>
+                    </div>
+                    <div class="flex justify-end pt-4">
+                        <button type="button" id="cancel-materi-btn" class="bg-gray-300 dark:bg-gray-600 px-4 py-2 rounded-lg mr-2">Batal</button>
+                        <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded-lg">${materiId ? 'Update' : 'Simpan'}</button>
+                    </div>
+                </form>`;
+            
+            openAdminModal(title, formHTML);
+            
+            // Fix: Use onclick assignment to prevent duplicate listeners
+            document.getElementById('materi-form').onsubmit = handleMateriSubmit;
+            document.getElementById('cancel-materi-btn').onclick = closeModal;
+        }
+
+        async function handleMateriSubmit(e) {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const newMateri = Object.fromEntries(formData.entries());
+            
+            newMateri.mapel_id = parseInt(newMateri.mapel_id);
+            newMateri.kelas_id = parseInt(newMateri.kelas_id);
+            newMateri.guru_id = parseInt(newMateri.guru_id);
+
+            let error;
+            if (newMateri.id) {
+                ({ error } = await supabase.from('materis').update(newMateri).eq('id', newMateri.id));
+            } else {
+                delete newMateri.id;
+                ({ error } = await supabase.from('materis').insert([newMateri]));
+            }
+
+            if (error) {
+                alert('Gagal menyimpan materi: ' + error.message);
+            } else {
+                closeModal();
+                renderAdminMateri();
+            }
+        }
+
+        async function deleteMateri(id) {
+            // Replaced window.confirm with Custom Modal to be consistent and prevent blocking
+            openAdminModal('Konfirmasi Hapus', `
+                <p>Apakah Anda yakin ingin menghapus materi ini?</p>
+                <div class="flex justify-end mt-4">
+                   <button id="confirm-cancel" class="bg-gray-300 dark:bg-gray-600 px-4 py-2 rounded-lg mr-2">Batal</button>
+                   <button id="confirm-delete" class="bg-red-500 text-white px-4 py-2 rounded-lg">Hapus</button>
+                </div>
+            `);
+            document.getElementById('confirm-cancel').onclick = closeModal;
+            document.getElementById('confirm-delete').onclick = async () => {
+                const { error } = await supabase.from('materis').delete().eq('id', id);
+                if (error) alert('Gagal menghapus: ' + error.message);
+                closeModal();
+                renderAdminMateri();
+            };
+        }
+
+        // --- MATERI VIEW (SISWA) ---
+        async function renderSiswaMateri() {
+            const siswa = state.currentUser.details;
+            const kelasId = siswa.kelas_id;
+            
+            // Refresh cache to ensure latest materials
+            await cacheInitialData();
+            
+            // Filter materials for this student's class
+            const materis = state.dbCache.materis.filter(m => m.kelas_id === kelasId);
+            
+            // Group by Subject (Mapel)
+            const materisByMapel = {};
+            materis.forEach(m => {
+                if (!materisByMapel[m.mapel_id]) materisByMapel[m.mapel_id] = [];
+                materisByMapel[m.mapel_id].push(m);
+            });
+
+            let html = `
+                <div class="mb-6">
+                    <h2 class="text-3xl font-bold">Materi Pelajaran</h2>
+                    <p class="text-gray-600 dark:text-gray-400">Kelas ${getKelasName(kelasId)}</p>
+                </div>
+            `;
+
+            if (Object.keys(materisByMapel).length === 0) {
+                html += `<div class="bg-white dark:bg-gray-800 p-8 rounded-lg shadow text-center">
+                            <i class="fas fa-folder-open text-4xl text-gray-400 mb-4"></i>
+                            <p class="text-lg">Belum ada materi yang dibagikan untuk kelas ini.</p>
+                         </div>`;
+            } else {
+                html += '<div class="grid grid-cols-1 gap-6">';
+                for (const mapelId in materisByMapel) {
+                    html += `
+                        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden">
+                            <div class="bg-blue-50 dark:bg-blue-900/30 p-4 border-b dark:border-gray-700">
+                                <h3 class="font-bold text-xl text-blue-700 dark:text-blue-300"><i class="fas fa-book mr-2"></i>${getMapelName(parseInt(mapelId))}</h3>
+                            </div>
+                            <div class="p-4 space-y-3">
+                                ${materisByMapel[mapelId].map(m => `
+                                    <div class="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                                        <div class="flex-1">
+                                            <div class="font-semibold text-lg text-gray-800 dark:text-white">${m.judul}</div>
+                                            <div class="text-sm text-gray-500 dark:text-gray-400 mb-1">Oleh: ${getGuruName(m.guru_id)}</div>
+                                            ${m.deskripsi ? `<div class="text-sm text-gray-600 dark:text-gray-300 italic">"${m.deskripsi}"</div>` : ''}
+                                        </div>
+                                        <a href="${m.link}" target="_blank" class="flex-shrink-0 ml-4 flex items-center justify-center w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800 transition">
+                                            <i class="fas fa-arrow-right"></i>
+                                        </a>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    `;
+                }
+                html += '</div>';
+            }
+
+            mainContent.innerHTML = html;
+        }
+
         // --- ADMIN FEATURES ---
         async function renderAdminJadwal() {
              mainContent.innerHTML = `
@@ -869,8 +1108,10 @@
                     </div>
                 </form>`;
             openAdminModal(title, formHTML);
-            document.getElementById('jadwal-form').addEventListener('submit', handleJadwalSubmit);
-            document.getElementById('cancel-btn').addEventListener('click', closeModal);
+            
+            // Fix: use onclick/onsubmit to avoid listener pileup
+            document.getElementById('jadwal-form').onsubmit = handleJadwalSubmit;
+            document.getElementById('cancel-btn').onclick = closeModal;
         }
 
         async function handleJadwalSubmit(e) {
@@ -907,7 +1148,6 @@
         }
 
         async function deleteJadwal(jadwalId) {
-            // A simple confirm replacement using the modal
             openAdminModal('Konfirmasi Hapus', `
                 <p>Apakah Anda yakin ingin menghapus jadwal ini?</p>
                 <div class="flex justify-end mt-4">
@@ -915,13 +1155,13 @@
                    <button id="confirm-delete" class="bg-red-500 text-white px-4 py-2 rounded-lg">Hapus</button>
                 </div>
             `);
-            document.getElementById('confirm-cancel').addEventListener('click', closeModal);
-            document.getElementById('confirm-delete').addEventListener('click', async () => {
+            document.getElementById('confirm-cancel').onclick = closeModal;
+            document.getElementById('confirm-delete').onclick = async () => {
                 const { error } = await supabase.from('jadwals').delete().eq('id', jadwalId);
                 if (error) console.error('Gagal menghapus:', error.message);
                 closeModal();
                 renderAdminJadwal();
-            });
+            };
         }
 
         // --- NEW: SYSTEM DEVELOPMENT & DATA MANAGEMENT ---
@@ -943,14 +1183,14 @@
                 <h2 class="text-3xl font-bold mb-6">Pengembangan Sistem & Manajemen Data</h2>
                 
                 <!-- Tab Navigation -->
-                <div class="mb-4 border-b dark:border-gray-700">
-                    <nav id="data-tabs" class="flex flex-wrap -mb-px text-sm font-medium text-center" role="tablist">
-                        <button class="tab-btn p-4 active" data-tab="kelas" role="tab" aria-selected="true">Kelas</button>
-                        <button class="tab-btn p-4" data-tab="gurus" role="tab" aria-selected="false">Guru</button>
-                        <button class="tab-btn p-4" data-tab="mapels" role="tab" aria-selected="false">Mata Pelajaran</button>
-                        <button class="tab-btn p-4" data-tab="ruangans" role="tab" aria-selected="false">Ruangan</button>
-                        <button class="tab-btn p-4" data-tab="users" role="tab" aria-selected="false">Pengguna (Users)</button>
-                        <button class="tab-btn p-4" data-tab="acara_sekolah" role="tab" aria-selected="false">Acara Sekolah</button>
+                <div class="mb-4 border-b dark:border-gray-700 overflow-x-auto">
+                    <nav id="data-tabs" class="flex flex-nowrap -mb-px text-sm font-medium text-center" role="tablist">
+                        <button class="tab-btn p-4 active whitespace-nowrap" data-tab="kelas" role="tab">Kelas</button>
+                        <button class="tab-btn p-4 whitespace-nowrap" data-tab="gurus" role="tab">Guru</button>
+                        <button class="tab-btn p-4 whitespace-nowrap" data-tab="mapels" role="tab">Mata Pelajaran</button>
+                        <button class="tab-btn p-4 whitespace-nowrap" data-tab="ruangans" role="tab">Ruangan</button>
+                        <button class="tab-btn p-4 whitespace-nowrap" data-tab="users" role="tab">Pengguna</button>
+                        <button class="tab-btn p-4 whitespace-nowrap" data-tab="acara_sekolah" role="tab">Acara Sekolah</button>
                     </nav>
                 </div>
 
@@ -1007,14 +1247,26 @@
             if (tableName === 'acara_sekolah') displayTitle = 'Acara Sekolah (Istirahat, dll)';
             if (tableName === 'users') displayTitle = 'Pengguna';
 
-            document.getElementById('tab-title').textContent = `Manajemen ${displayTitle}`;
+            // Safe DOM update: check if element exists
+            const tabTitleEl = document.getElementById('tab-title');
+            if (tabTitleEl) {
+                tabTitleEl.textContent = `Manajemen ${displayTitle}`;
+            }
             
             // Re-cache all data before rendering tables
             await cacheInitialData();
             
-            const data = state.dbCache[tableName === 'acara_sekolah' ? 'acaraSekolah' : tableName];
+            // --- GUARD CLAUSE: CHECK IF VIEW IS STILL ACTIVE ---
             const tableHeader = document.getElementById('data-table-header');
             const tableBody = document.getElementById('data-table-body');
+            
+            // If user navigated away during async fetch, stop execution to prevent "setting innerHTML of null"
+            if (!tableHeader || !tableBody) {
+                return;
+            }
+            // ----------------------------------------------------
+
+            const data = state.dbCache[tableName === 'acara_sekolah' ? 'acaraSekolah' : tableName];
             tableBody.innerHTML = `<tr><td colspan="10" class="p-4 text-center">Memuat data...</td></tr>`;
 
             let headers = [];
@@ -1032,12 +1284,11 @@
                         </td>
                     </tr>`).join('');
             } else if (tableName === 'gurus') {
-                headers = ['ID', 'Nama', 'NIP', 'Mapel'];
+                headers = ['ID', 'Nama', 'Mapel'];
                 rowsHTML = data.map(d => `
                     <tr class="border-t dark:border-gray-600">
                         <td class="p-4">${d.id}</td>
                         <td class="p-4">${d.nama}</td>
-                        <td class="p-4">${d.nip}</td>
                         <td class="p-4">${d.mapel}</td>
                         <td class="p-4">
                             <button class="edit-data-btn text-blue-500 hover:text-blue-700 mr-2" data-table="${tableName}" data-id="${d.id}"><i class="fas fa-edit"></i></button>
@@ -1132,10 +1383,6 @@
                     <div>
                         <label class="block text-sm font-medium">Nama Guru</label>
                         <input type="text" name="nama" value="${data.nama || ''}" required class="mt-1 block w-full p-2 border rounded-md dark:bg-gray-700">
-                    </div>
-                     <div>
-                        <label class="block text-sm font-medium">NIP</label>
-                        <input type="text" name="nip" value="${data.nip || ''}" required class="mt-1 block w-full p-2 border rounded-md dark:bg-gray-700">
                     </div>
                      <div>
                         <label class="block text-sm font-medium">Mata Pelajaran yang Diajar</label>
@@ -1233,8 +1480,10 @@
                 </form>`;
                 
             openAdminModal(title, formHTML);
-            document.getElementById('data-form').addEventListener('submit', handleDataSubmit);
-            document.getElementById('cancel-data-btn').addEventListener('click', closeModal);
+            
+            // Fix: Use onclick assignment
+            document.getElementById('data-form').onsubmit = handleDataSubmit;
+            document.getElementById('cancel-data-btn').onclick = closeModal;
         }
 
         async function handleDataSubmit(e) {
@@ -1263,7 +1512,6 @@
 
             if (error) {
                  console.error('Gagal menyimpan data:', error.message);
-                 // Display a message inside the modal or using a temporary UI element
                  alert('Gagal menyimpan data: ' + error.message);
             } else {
                 closeModal();
@@ -1280,10 +1528,10 @@
                    <button id="confirm-delete" class="bg-red-500 text-white px-4 py-2 rounded-lg" data-table="${tableName}" data-id="${dataId}">Hapus Permanen</button>
                 </div>
             `);
-            document.getElementById('confirm-cancel').addEventListener('click', closeModal);
-            document.getElementById('confirm-delete').addEventListener('click', async (e) => {
-                const table = e.currentTarget.dataset.table;
-                const id = e.currentTarget.dataset.id;
+            document.getElementById('confirm-cancel').onclick = closeModal;
+            document.getElementById('confirm-delete').onclick = async (e) => {
+                const table = tableName;
+                const id = dataId;
                 const { error } = await supabase.from(table).delete().eq('id', id);
                 if (error) {
                      console.error('Gagal menghapus:', error.message);
@@ -1293,7 +1541,7 @@
                     // Re-render the correct table content
                     await renderTableContent(table);
                 }
-            });
+            };
         }
         
         // --- END: SYSTEM DEVELOPMENT & DATA MANAGEMENT ---
@@ -1423,7 +1671,7 @@
              setupNotifications();
         });
 
-        // --- EXPORT (No changes needed) ---
+        // --- EXPORT ---
         function exportJadwal(format, title, data, role) {
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF();
